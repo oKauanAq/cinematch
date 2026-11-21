@@ -118,7 +118,8 @@
     return h('article', { class: 'cartao', 'data-id': filme.id },
       h('div', { class: 'cartao__poster' }, posterEl(filme), botaoFav),
       h('div', { class: 'cartao__corpo' },
-        h('h3', { class: 'cartao__titulo' }, filme.titulo),
+        h('h3', { class: 'cartao__titulo' },
+          h('button', { type: 'button', class: 'cartao__abrir', 'aria-haspopup': 'dialog', onclick: () => abrirDetalhe(filme.id) }, filme.titulo)),
         h('p', { class: 'cartao__meta' },
           h('span', { class: 'nota', title: 'Nota de referência' }, '★ ' + filme.nota.toFixed(1)),
           ' · ' + formatarDuracao(filme.duracao) + (filme.tipo === 'série' ? '/ep' : '') +
@@ -129,6 +130,47 @@
         opcoes.estrelas ? estrelasEl(filme.id) : null
       )
     );
+  }
+
+  /** Janela com os detalhes do título (abre ao clicar no nome). Esc fecha. */
+  function abrirDetalhe(id) {
+    const f = porId(id);
+    if (!f) return;
+    const dlg = $('#dlg-detalhe');
+    const fav = ehFavorito(id);
+    $('#det-conteudo').replaceChildren(
+      h('div', { class: 'det' },
+        posterEl(f),
+        h('div', { class: 'det__corpo' },
+          h('h2', { id: 'det-titulo' }, f.titulo),
+          h('p', { class: 'cartao__meta' },
+            f.tipo + ' · ' + f.ano + ' · ★ ' + f.nota.toFixed(1) + ' · ' + formatarDuracao(f.duracao) +
+            (f.tipo === 'série' ? '/ep' : '') + ' · ' + (f.idade ? f.idade + '+' : 'Livre')),
+          h('p', { class: 'cartao__cat' }, f.generos.join(' · ')),
+          h('p', {}, f.sinopse),
+          h('p', { class: 'cartao__cat' },
+            'Combina com quem está: ' + f.humores.map(x => HUMORES[x].rotulo.toLowerCase()).join(', ') + '.'),
+          h('button', {
+            type: 'button', class: 'btn btn--primario',
+            onclick: () => { alternarFavorito(id); abrirDetalhe(id); }
+          }, fav ? '♥ Nos favoritos (remover)' : '♡ Adicionar aos favoritos'))));
+    if (!dlg.open) dlg.showModal();
+  }
+
+  /** Baixa a lista de favoritos como arquivo .txt (funciona em file:// e no Pages). */
+  function exportarFavoritos() {
+    const favs = estado.favoritos.map(porId).filter(Boolean);
+    if (!favs.length) return toast('Nada para exportar ainda.');
+    const linhas = ['CineMatch — meus favoritos', ''].concat(favs.map((f, i) =>
+      (i + 1) + '. ' + f.titulo + ' (' + f.ano + ') — ' + f.generos.join(', ') + ' — ★ ' + f.nota.toFixed(1) +
+      (estado.avaliacoes[f.id] ? ' — minha nota: ' + estado.avaliacoes[f.id] + '/5' : '')));
+    const url = URL.createObjectURL(new Blob([linhas.join('\n')], { type: 'text/plain;charset=utf-8' }));
+    const a = h('a', { href: url, download: 'meus-favoritos-cinematch.txt' });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Lista exportada: meus-favoritos-cinematch.txt');
   }
 
   /* ---------- AÇÕES SOBRE OS DADOS ---------- */
@@ -209,6 +251,7 @@
     });
     // Mesmos gêneros no filtro da busca
     TODOS_GENEROS.forEach(g => $('#busca-genero').append(h('option', { value: g }, g)));
+    TODOS_GENEROS.forEach(g => $('#fav-genero').append(h('option', { value: g }, g)));
     aplicarPrefsNoFormulario();
   }
 
@@ -365,12 +408,30 @@
   }
 
   /* --- FAVORITOS + ESTATÍSTICAS + DECIDE POR MIM --- */
+  /** Critérios de ordenação da lista de favoritos. */
+  const ORDENS = {
+    nota: (a, b) => b.nota - a.nota,
+    duracao: (a, b) => a.duracao - b.duracao,
+    ano: (a, b) => b.ano - a.ano,
+    nome: (a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR')
+  };
+
   function renderFavoritos() {
-    const favs = estado.favoritos.map(porId).filter(Boolean);
-    $('#vazio-fav').hidden = favs.length > 0;
-    $('#btn-decide').disabled = favs.length < 2;
-    $('#grade-fav').replaceChildren(...favs.map(f => cartaoEl(f, { estrelas: true })));
-    renderEstatisticas(favs);
+    const todos = estado.favoritos.map(porId).filter(Boolean);
+    $('#vazio-fav').hidden = todos.length > 0;
+    $('#fav-barra').hidden = todos.length === 0;
+    $('#btn-decide').disabled = todos.length < 2;
+
+    // filtro por gênero e ordenação (a estatística sempre usa a lista completa)
+    const genero = $('#fav-genero').value;
+    const ordem = $('#fav-ordem').value;
+    const lista = genero ? todos.filter(f => f.generos.includes(genero)) : todos.slice();
+    if (ORDENS[ordem]) lista.sort(ORDENS[ordem]); else lista.reverse(); // "recente" = último salvo primeiro
+
+    $('#grade-fav').replaceChildren(...(lista.length || !todos.length
+      ? lista.map(f => cartaoEl(f, { estrelas: true }))
+      : [h('p', { class: 'vazio' }, 'Nenhum favorito nesse gênero. Escolha "Todos" para ver a lista completa.')]));
+    renderEstatisticas(todos);
   }
 
   function renderEstatisticas(favs) {
@@ -457,8 +518,9 @@
   function aplicarTema(tema) {
     document.documentElement.dataset.tema = tema;
     $('#icone-tema').textContent = tema === 'escuro' ? '🌙' : '☀️';
+    // rótulo fixo + aria-pressed (mudar os dois ao mesmo tempo confunde leitores de tela)
     $('#btn-tema').setAttribute('aria-pressed', String(tema === 'claro'));
-    $('#btn-tema').setAttribute('aria-label', tema === 'escuro' ? 'Mudar para o tema claro' : 'Mudar para o tema escuro');
+    $('#btn-tema').setAttribute('aria-label', 'Tema claro');
   }
 
   function alternarTema() {
@@ -550,6 +612,13 @@
     $('#form-busca').addEventListener('submit', e => e.preventDefault());
 
     $('#btn-decide').addEventListener('click', decidirPorMim);
+    $('#fav-ordem').addEventListener('change', renderFavoritos);
+    $('#fav-genero').addEventListener('change', renderFavoritos);
+    $('#btn-exportar').addEventListener('click', exportarFavoritos);
+    $('#btn-fechar-dica').addEventListener('click', () => {
+      $('#dica').hidden = true;
+      storage.salvar('dicaVista', true);
+    });
     $('#btn-limpar-hist').addEventListener('click', () => {
       const copia = estado.historico.slice();
       estado.historico = []; storage.salvar('historico', []);
@@ -567,6 +636,7 @@
     ligarConfiguracoes();
     montarFila();
     $('#cont-fav').textContent = estado.favoritos.length;
+    $('#dica').hidden = storage.ler('dicaVista', false); // dica só no primeiro acesso
     renderBusca();
     renderFavoritos();
     irParaAba(abaDoHash(), false);
