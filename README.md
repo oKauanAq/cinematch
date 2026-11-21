@@ -18,7 +18,7 @@ Feito só com **HTML5, CSS3 e JavaScript puro**, sem frameworks e sem build. Os 
 | RF06 LocalStorage | Preferências, favoritos, histórico, avaliações, tema e recusados persistem |
 | Tema | Claro e escuro; respeita o sistema na primeira visita |
 
-**Diferenciais:** modo **Match** (aceitar/recusar por botões, setas do teclado ou arrastando), **Decide por mim** (sorteio entre os favoritos), busca com filtros, avaliação por estrelas, estatísticas dos favoritos, integração opcional com o **TMDb** e respeito a `prefers-reduced-motion`.
+**Diferenciais:** modo **Match** (aceitar/recusar por botões, setas do teclado ou arrastando), **Decide por mim** (sorteio entre os favoritos), busca com filtros, janela de **detalhes** do título, **ordenar e filtrar** favoritos, **exportar** a lista em `.txt`, avaliação por estrelas, estatísticas dos favoritos, dica de primeiro acesso, integração opcional com o **TMDb** e respeito a `prefers-reduced-motion`.
 
 ## Pôsteres reais com o TMDb (opcional)
 1. Crie uma chave grátis em https://www.themoviedb.org/settings/api (tipo *Developer*).
