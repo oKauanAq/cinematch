@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CineMatch — Recomendador de Filmes e Séries</title>
+  <meta name="description" content="Diga seu humor, o tempo que você tem e seus gêneros favoritos. O CineMatch escolhe 3 filmes ou séries para você assistir agora.">
+  <meta name="color-scheme" content="dark light">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%230e0c0b'/%3E%3Cpath d='M38 28l36 22-36 22z' fill='%23f2b84b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    /* Aplica o tema salvo ANTES de pintar a página (evita "piscar" claro→escuro). */
+    (function () {
+      var tema = null;
+      try { tema = JSON.parse(localStorage.getItem('cinematch:tema')); } catch (e) {}
+      if (!tema) tema = window.matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'escuro';
+      document.documentElement.dataset.tema = tema;
+    })();
+  </script>
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="topo__linha">
+      <a class="marca" href="#descobrir" aria-label="CineMatch, ir para o início">
+        <span class="marca__icone" aria-hidden="true">▶</span>
+        <span class="marca__nome">Cine<em>Match</em></span>
+      </a>
+      <div class="topo__acoes">
+        <button type="button" class="btn-icone" id="btn-tema" aria-label="Alternar tema claro e escuro" aria-pressed="false">
+          <span aria-hidden="true" id="icone-tema">🌙</span>
+        </button>
+        <button type="button" class="btn-icone" id="btn-config" aria-label="Abrir configurações" aria-haspopup="dialog">
+          <span aria-hidden="true">⚙️</span>
+        </button>
+      </div>
+    </div>
+    <nav class="abas" aria-label="Seções do CineMatch">
+      <ul>
+        <li><a href="#descobrir" data-aba="descobrir">Descobrir</a></li>
+        <li><a href="#match" data-aba="match">Match</a></li>
+        <li><a href="#buscar" data-aba="buscar">Buscar</a></li>
+        <li><a href="#favoritos" data-aba="favoritos">Favoritos <span class="contador" id="cont-fav" aria-label="quantidade de favoritos">0</span></a></li>
+        <li><a href="#historico" data-aba="historico">Histórico</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="conteudo" tabindex="-1">
+
+    <!-- DESCOBRIR: preferências (RF01) + recomendações (RF02) -->
+    <section id="descobrir" class="tela" aria-labelledby="t-descobrir">
+      <div class="heroi">
+        <p class="heroi__selo">Menos rolagem, mais sessão.</p>
+        <h1 id="t-descobrir">Seu momento.<br><em>Seu próximo play.</em></h1>
+        <p class="heroi__texto">Conte como você está e quanto tempo tem. Em segundos, o CineMatch escolhe 3 títulos — e explica o porquê.</p>
+      </div>
+
+      <form id="form-prefs" class="prefs" novalidate>
+        <fieldset>
+          <legend><span class="passo">1</span> Como você está agora?</legend>
+          <div class="humores" id="humores" role="radiogroup" aria-label="Humor atual"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend><span class="passo">2</span> Quais gêneros você curte? <small>(escolha um ou mais)</small></legend>
+          <div class="chips" id="generos"></div>
+        </fieldset>
+
+        <div class="prefs__duplo">
+          <fieldset>
+            <legend><span class="passo">3</span> Tempo disponível</legend>
+            <div class="segmento" id="tempo">
+              <label><input type="radio" name="tempo" value="60"><span>Até 1 h</span></label>
+              <label><input type="radio" name="tempo" value="120" checked><span>Até 2 h</span></label>
+              <label><input type="radio" name="tempo" value="0"><span>Sem limite</span></label>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend><span class="passo">4</span> Faixa etária</legend>
+            <div class="segmento" id="idade">
+              <label><input type="radio" name="idade" value="10"><span>Livre / 10</span></label>
+              <label><input type="radio" name="idade" value="14"><span>Até 14</span></label>
+              <label><input type="radio" name="idade" value="16"><span>Até 16</span></label>
+              <label><input type="radio" name="idade" value="18" checked><span>18+</span></label>
+            </div>
+          </fieldset>
+        </div>
+
+        <p class="erro" id="erro-prefs" role="alert" hidden></p>
+        <div class="prefs__acoes">
+          <button type="submit" class="btn btn--primario btn--grande">Recomendar 3 títulos</button>
+          <button type="button" class="btn btn--fantasma" id="btn-limpar-prefs">Limpar escolhas</button>
+        </div>
+      </form>
+
+      <section id="resultado" class="resultado" aria-labelledby="t-resultado" aria-live="polite" hidden>
+        <div class="secao-cab">
+          <h2 id="t-resultado">Para você, agora</h2>
+          <button type="button" class="btn btn--secundario" id="btn-outras">↻ Outras 3</button>
+        </div>
+        <div class="grade" id="grade-resultado"></div>
+      </section>
+    </section>
+
+    <!-- MATCH: aceitar / recusar -->
+    <section id="match" class="tela" aria-labelledby="t-match" hidden>
+      <h2 id="t-match">Modo Match</h2>
+      <p class="sub">Aceite o que te interessa (vai para os favoritos) e recuse o resto — o que você recusa não volta nas recomendações. Dica: use as setas ← → do teclado ou arraste o cartão.</p>
+      <div class="match" id="match-area" aria-live="polite"></div>
+      <div class="match__botoes">
+        <button type="button" class="btn btn--perigo btn--grande" id="btn-recusar">✕ Recusar</button>
+        <button type="button" class="btn btn--primario btn--grande" id="btn-aceitar">♥ Aceitar</button>
+      </div>
+      <p class="sub sub--pequeno"><button type="button" class="link" id="btn-zerar-recusados">Esquecer títulos recusados</button> <span id="info-recusados"></span></p>
+    </section>
+
+    <!-- BUSCAR -->
+    <section id="buscar" class="tela" aria-labelledby="t-buscar" hidden>
+      <h2 id="t-buscar">Buscar títulos</h2>
+      <form class="busca" role="search" id="form-busca">
+        <label class="busca__campo">
+          <span class="so-leitor">Buscar por nome</span>
+          <input type="search" id="busca-texto" placeholder="Nome ou trecho da sinopse…" autocomplete="off">
+        </label>
+        <label>
+          <span class="so-leitor">Filtrar por gênero</span>
+          <select id="busca-genero"><option value="">Todos os gêneros</option></select>
+        </label>
+        <label>
+          <span class="so-leitor">Filtrar por tipo</span>
+          <select id="busca-tipo">
+            <option value="">Filmes e séries</option>
+            <option value="filme">Só filmes</option>
+            <option value="série">Só séries</option>
+          </select>
+        </label>
+      </form>
+      <p class="sub" id="busca-info" role="status"></p>
+      <div class="grade" id="grade-busca"></div>
+    </section>
+
+    <!-- FAVORITOS (RF03/RF04) -->
+    <section id="favoritos" class="tela" aria-labelledby="t-fav" hidden>
+      <div class="secao-cab">
+        <h2 id="t-fav">Meus Favoritos</h2>
+        <button type="button" class="btn btn--primario" id="btn-decide">🎲 Decide por mim</button>
+      </div>
+      <div class="sorteio" id="sorteio" role="status" aria-live="polite" hidden></div>
+      <div id="estatisticas" class="stats" hidden></div>
+      <div class="grade" id="grade-fav"></div>
+      <p class="vazio" id="vazio-fav" hidden>Você ainda não salvou nada. Toque em ♡ nas recomendações ou use o modo Match.</p>
+    </section>
+
+    <!-- HISTÓRICO (RF05) -->
+    <section id="historico" class="tela" aria-labelledby="t-hist" hidden>
+      <div class="secao-cab">
+        <h2 id="t-hist">Histórico de recomendações</h2>
+        <button type="button" class="btn btn--secundario" id="btn-limpar-hist">Limpar histórico</button>
+      </div>
+      <ol class="linha-tempo" id="lista-hist"></ol>
+      <p class="vazio" id="vazio-hist" hidden>Nada por aqui ainda. Gere recomendações para ver o histórico.</p>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <p>CineMatch · Projeto de Desenvolvimento de Interfaces (CEUB) · feito com HTML, CSS e JavaScript puros.</p>
+    <p class="rodape__peq">Notas são aproximadas, só para referência. Pôsteres são gerados em CSS; com chave do TMDb você vê os reais.</p>
+    <p class="rodape__peq">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+  </footer>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <dialog id="dlg-config" aria-labelledby="t-config">
+    <form method="dialog" id="form-config">
+      <h2 id="t-config">Configurações</h2>
+      <p class="sub">Opcional: cole sua chave (API Key v3) do <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">TMDb</a> para ver pôsteres reais. A chave fica <strong>só neste navegador</strong> e nunca é enviada para outro lugar além do TMDb.</p>
+      <label class="campo">
+        <span>Chave do TMDb</span>
+        <input type="password" id="cfg-chave" autocomplete="off" spellcheck="false" placeholder="Deixe vazio para usar só a base local">
+      </label>
+      <p class="erro" id="cfg-msg" role="status" hidden></p>
+      <div class="dlg-acoes">
+        <button type="button" class="btn btn--secundario" id="cfg-testar">Testar chave</button>
+        <button type="button" class="btn btn--primario" id="cfg-salvar">Salvar</button>
+        <button type="submit" class="btn btn--fantasma" value="cancelar">Fechar</button>
+      </div>
+      <hr>
+      <button type="button" class="link link--perigo" id="cfg-apagar">Apagar todos os meus dados do CineMatch</button>
+    </form>
+  </dialog>
+
+  <script src="js/storage.js"></script>
+  <script src="js/movies.js"></script>
+  <script src="js/recommend.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
